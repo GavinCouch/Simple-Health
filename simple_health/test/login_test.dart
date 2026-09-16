@@ -64,10 +64,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('loginUsername')), 'nobody');
-    await tester.enterText(
-      find.byKey(const Key('loginPassword')),
-      'whatever',
-    );
+    await tester.enterText(find.byKey(const Key('loginPassword')), 'whatever');
     await tester.tap(find.text('Log in'));
     await tester.pumpAndSettle();
 
@@ -89,10 +86,7 @@ void main() {
     await tester.tap(find.text("Don't have an account? Sign up"));
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('registerUsername')),
-      'taylor',
-    );
+    await tester.enterText(find.byKey(const Key('registerUsername')), 'taylor');
     await tester.enterText(
       find.byKey(const Key('registerPassword')),
       'password1',
@@ -122,10 +116,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('loginUsername')), 'morgan');
-    await tester.enterText(
-      find.byKey(const Key('loginPassword')),
-      'letmein1',
-    );
+    await tester.enterText(find.byKey(const Key('loginPassword')), 'letmein1');
     await tester.tap(find.text('Log in'));
     await tester.pumpAndSettle();
 

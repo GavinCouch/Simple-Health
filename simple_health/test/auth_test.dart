@@ -16,17 +16,20 @@ void main() {
     return repository;
   }
 
-  test('registers a user and signs them in with matching credentials', () async {
-    final directory = await Directory.systemTemp.createTemp('auth_test');
-    addTearDown(() => directory.delete(recursive: true));
-    final repository = await openRepository(directory);
+  test(
+    'registers a user and signs them in with matching credentials',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('auth_test');
+      addTearDown(() => directory.delete(recursive: true));
+      final repository = await openRepository(directory);
 
-    final registered = await repository.register('alice', 'hunter22');
-    expect(registered.username, 'alice');
+      final registered = await repository.register('alice', 'hunter22');
+      expect(registered.username, 'alice');
 
-    final loggedIn = await repository.login('alice', 'hunter22');
-    expect(loggedIn?.id, registered.id);
-  });
+      final loggedIn = await repository.login('alice', 'hunter22');
+      expect(loggedIn?.id, registered.id);
+    },
+  );
 
   test('rejects a login with the wrong password', () async {
     final directory = await Directory.systemTemp.createTemp('auth_test');

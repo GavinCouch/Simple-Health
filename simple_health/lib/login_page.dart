@@ -214,8 +214,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
-                    validator: (value) =>
-                        value == null || value.isEmpty
+                    validator: (value) => value == null || value.isEmpty
                         ? 'Enter your password'
                         : null,
                   ),

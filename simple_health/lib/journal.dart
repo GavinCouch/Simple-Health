@@ -62,8 +62,11 @@ abstract class JournalRepository {
 }
 
 class SqliteJournal implements JournalRepository {
-  SqliteJournal({required this.userId, DatabaseFactory? factory, this.databasePath})
-    : _factory = factory ?? databaseFactory;
+  SqliteJournal({
+    required this.userId,
+    DatabaseFactory? factory,
+    this.databasePath,
+  }) : _factory = factory ?? databaseFactory;
   final int userId;
   final DatabaseFactory _factory;
   final String? databasePath;
