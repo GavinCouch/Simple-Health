@@ -13,6 +13,7 @@ void main() {
         'daily_fuel_test',
       );
       final repository = SqliteJournal(
+        userId: 1,
         factory: databaseFactoryFfi,
         databasePath: '${directory.path}/journal.db',
       );
@@ -59,6 +60,64 @@ void main() {
       await repository.deleteEntry(entry.id!);
       expect((await repository.load(entry.date)).entries, isEmpty);
       expect((await repository.load('2026-09-14')).total, 200);
+    },
+  );
+
+  test(
+    'entries and goals are isolated between different users sharing a database',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'daily_fuel_test',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final dbPath = '${directory.path}/journal.db';
+
+      final alice = SqliteJournal(
+        userId: 1,
+        factory: databaseFactoryFfi,
+        databasePath: dbPath,
+      );
+      final bob = SqliteJournal(
+        userId: 2,
+        factory: databaseFactoryFfi,
+        databasePath: dbPath,
+      );
+      addTearDown(alice.close);
+      addTearDown(bob.close);
+
+      await alice.setGoal(2000);
+      await alice.saveEntry(
+        const FoodEntry(
+          date: '2026-09-15',
+          name: "Alice's oats",
+          meal: Meal.breakfast,
+          calories: 250,
+          servings: 1,
+        ),
+      );
+
+      await bob.setGoal(2500);
+      await bob.saveEntry(
+        const FoodEntry(
+          date: '2026-09-15',
+          name: "Bob's toast",
+          meal: Meal.breakfast,
+          calories: 120,
+          servings: 1,
+        ),
+      );
+
+      final aliceSnapshot = await alice.load('2026-09-15');
+      expect(aliceSnapshot.goal, 2000);
+      expect(aliceSnapshot.entries.single.name, "Alice's oats");
+
+      final bobSnapshot = await bob.load('2026-09-15');
+      expect(bobSnapshot.goal, 2500);
+      expect(bobSnapshot.entries.single.name, "Bob's toast");
+
+      // Bob cannot delete Alice's entry even if he knows its id.
+      await bob.deleteEntry(aliceSnapshot.entries.single.id!);
+      expect((await alice.load('2026-09-15')).entries, hasLength(1));
     },
   );
 }

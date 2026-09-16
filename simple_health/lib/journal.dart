@@ -62,8 +62,9 @@ abstract class JournalRepository {
 }
 
 class SqliteJournal implements JournalRepository {
-  SqliteJournal({DatabaseFactory? factory, this.databasePath})
+  SqliteJournal({required this.userId, DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? databaseFactory;
+  final int userId;
   final DatabaseFactory _factory;
   final String? databasePath;
   Future<Database>? _opening;
@@ -84,23 +85,33 @@ class SqliteJournal implements JournalRepository {
     databasePath ??
         path.join(await _factory.getDatabasesPath(), 'daily_fuel.db'),
     options: OpenDatabaseOptions(
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute(
-          'CREATE TABLE entries ('
-          'id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, '
-          'name TEXT NOT NULL, meal INTEGER NOT NULL CHECK(meal BETWEEN 0 AND 3), '
-          'calories INTEGER NOT NULL CHECK(calories >= 0), '
-          'servings REAL NOT NULL CHECK(servings > 0))',
-        );
-        await db.execute('CREATE INDEX entries_day ON entries(day)');
-        await db.execute(
-          'CREATE TABLE settings (id INTEGER PRIMARY KEY, '
-          'goal INTEGER NOT NULL CHECK(goal > 0))',
-        );
+      version: 2,
+      onCreate: (db, version) => _createSchema(db),
+      onUpgrade: (db, oldVersion, newVersion) async {
+        // Earlier versions kept a single shared journal with no owner, so
+        // there is no sound way to attribute that data to a specific user.
+        await db.execute('DROP TABLE IF EXISTS entries');
+        await db.execute('DROP TABLE IF EXISTS settings');
+        await _createSchema(db);
       },
     ),
   );
+
+  static Future<void> _createSchema(Database db) async {
+    await db.execute(
+      'CREATE TABLE entries ('
+      'id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, '
+      'day TEXT NOT NULL, '
+      'name TEXT NOT NULL, meal INTEGER NOT NULL CHECK(meal BETWEEN 0 AND 3), '
+      'calories INTEGER NOT NULL CHECK(calories >= 0), '
+      'servings REAL NOT NULL CHECK(servings > 0))',
+    );
+    await db.execute('CREATE INDEX entries_user_day ON entries(user_id, day)');
+    await db.execute(
+      'CREATE TABLE settings (user_id INTEGER PRIMARY KEY, '
+      'goal INTEGER NOT NULL CHECK(goal > 0))',
+    );
+  }
 
   @override
   Future<JournalSnapshot> load(String day) async {
@@ -108,11 +119,15 @@ class SqliteJournal implements JournalRepository {
     return db.transaction((txn) async {
       final rows = await txn.query(
         'entries',
-        where: 'day = ?',
-        whereArgs: [day],
+        where: 'user_id = ? AND day = ?',
+        whereArgs: [userId, day],
         orderBy: 'id ASC',
       );
-      final goals = await txn.query('settings', where: 'id = 1');
+      final goals = await txn.query(
+        'settings',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
       return JournalSnapshot(
         rows.map(FoodEntry.fromMap).toList(),
         goals.isEmpty ? null : goals.single['goal'] as int,
@@ -129,14 +144,15 @@ class SqliteJournal implements JournalRepository {
       throw ArgumentError('Invalid food entry');
     }
     final db = await _database();
+    final map = entry.toMap()..['user_id'] = userId;
     if (entry.id == null) {
-      await db.insert('entries', entry.toMap());
+      await db.insert('entries', map);
     } else {
       await db.update(
         'entries',
-        entry.toMap(),
-        where: 'id = ?',
-        whereArgs: [entry.id],
+        map,
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [entry.id, userId],
       );
     }
   }
@@ -145,8 +161,8 @@ class SqliteJournal implements JournalRepository {
   Future<void> deleteEntry(int id) async {
     await (await _database()).delete(
       'entries',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [id, userId],
     );
   }
 
@@ -154,7 +170,7 @@ class SqliteJournal implements JournalRepository {
   Future<void> setGoal(int goal) async {
     if (goal <= 0) throw ArgumentError('Goal must be positive');
     await (await _database()).insert('settings', {
-      'id': 1,
+      'user_id': userId,
       'goal': goal,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }

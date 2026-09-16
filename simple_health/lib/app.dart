@@ -7,6 +7,32 @@ const pine = Color(0xFF153E34);
 const lime = Color(0xFFD6E8AC);
 const muted = Color(0xFF6B8075);
 
+ThemeData buildAppTheme() => ThemeData(
+  useMaterial3: true,
+  scaffoldBackgroundColor: const Color(0xFFF5F7F6),
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: pine,
+    primary: pine,
+    secondary: const Color(0xFF536E31),
+  ),
+  appBarTheme: const AppBarTheme(
+    backgroundColor: Color(0xFFF5F7F6),
+    foregroundColor: pine,
+    surfaceTintColor: Colors.transparent,
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    filled: true,
+    fillColor: Colors.white,
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: FilledButton.styleFrom(
+      minimumSize: const Size(48, 52),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+  ),
+);
+
 class DailyFuelApp extends StatelessWidget {
   const DailyFuelApp({super.key, required this.repository});
   final JournalRepository repository;
@@ -15,40 +41,15 @@ class DailyFuelApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Simple Health',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF5F7F6),
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: pine,
-        primary: pine,
-        secondary: const Color(0xFF536E31),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFF5F7F6),
-        foregroundColor: pine,
-        surfaceTintColor: Colors.transparent,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(48, 52),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      ),
-    ),
+    theme: buildAppTheme(),
     home: JournalPage(repository: repository),
   );
 }
 
 class JournalPage extends StatefulWidget {
-  const JournalPage({super.key, required this.repository});
+  const JournalPage({super.key, required this.repository, this.onLogout});
   final JournalRepository repository;
+  final VoidCallback? onLogout;
   @override
   State<JournalPage> createState() => _JournalPageState();
 }
@@ -205,6 +206,12 @@ class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
             onPressed: disabled ? null : _goal,
             icon: const Icon(Icons.tune_rounded),
           ),
+          if (widget.onLogout != null)
+            IconButton(
+              tooltip: 'Log out',
+              onPressed: widget.onLogout,
+              icon: const Icon(Icons.logout_rounded),
+            ),
           const SizedBox(width: 8),
         ],
       ),
