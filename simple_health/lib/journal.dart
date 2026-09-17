@@ -54,11 +54,23 @@ class JournalSnapshot {
   int get total => entries.fold(0, (total, entry) => total + entry.total);
 }
 
+class QuickAddFood {
+  const QuickAddFood({
+    required this.name,
+    required this.calories,
+    required this.servings,
+  });
+  final String name;
+  final int calories;
+  final double servings;
+}
+
 abstract class JournalRepository {
   Future<JournalSnapshot> load(String day);
   Future<void> saveEntry(FoodEntry entry);
   Future<void> deleteEntry(int id);
   Future<void> setGoal(int goal);
+  Future<List<QuickAddFood>> recentFoods({int limit = 8});
 }
 
 class SqliteJournal implements JournalRepository {
@@ -176,6 +188,28 @@ class SqliteJournal implements JournalRepository {
       'user_id': userId,
       'goal': goal,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  Future<List<QuickAddFood>> recentFoods({int limit = 8}) async {
+    final db = await _database();
+    final rows = await db.rawQuery(
+      'SELECT name, calories, servings, COUNT(*) AS frequency, MAX(id) AS last_id '
+      'FROM entries '
+      'WHERE user_id = ? '
+      'GROUP BY LOWER(TRIM(name)), calories '
+      'ORDER BY frequency DESC, last_id DESC '
+      'LIMIT ?',
+      [userId, limit],
+    );
+    return [
+      for (final row in rows)
+        QuickAddFood(
+          name: row['name'] as String,
+          calories: row['calories'] as int,
+          servings: (row['servings'] as num).toDouble(),
+        ),
+    ];
   }
 
   Future<void> close() async {

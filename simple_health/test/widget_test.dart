@@ -37,6 +37,33 @@ class MemoryJournal implements JournalRepository {
   Future<void> setGoal(int value) async {
     goal = value;
   }
+
+  @override
+  Future<List<QuickAddFood>> recentFoods({int limit = 8}) async {
+    final groups = <String, List<FoodEntry>>{};
+    for (final entry in entries) {
+      groups
+          .putIfAbsent(
+            '${entry.name.trim().toLowerCase()}|${entry.calories}',
+            () => [],
+          )
+          .add(entry);
+    }
+    final ranked = groups.values.toList()
+      ..sort((a, b) {
+        final byFrequency = b.length.compareTo(a.length);
+        if (byFrequency != 0) return byFrequency;
+        return entries.indexOf(b.last).compareTo(entries.indexOf(a.last));
+      });
+    return [
+      for (final group in ranked.take(limit))
+        QuickAddFood(
+          name: group.last.name,
+          calories: group.last.calories,
+          servings: group.last.servings,
+        ),
+    ];
+  }
 }
 
 void main() {
@@ -81,6 +108,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.entries.single.name, 'Toast');
   });
+  testWidgets(
+    'shows a quick-add suggestion after logging a food once and prefills on tap',
+    (tester) async {
+      final repository = MemoryJournal();
+      await tester.pumpWidget(DailyFuelApp(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Log food'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('foodName')),
+        'Chicken Salad',
+      );
+      await tester.enterText(find.byKey(const Key('foodCalories')), '450');
+      await tester.ensureVisible(find.text('Add to journal'));
+      await tester.tap(find.text('Add to journal'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Log food'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('quickAddRow')), findsOneWidget);
+      expect(find.byKey(const Key('quickAddChip_0')), findsOneWidget);
+      expect(find.text('Chicken Salad · 450 kcal'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('quickAddChip_0')));
+      await tester.pumpAndSettle();
+
+      final nameField = tester.widget<TextFormField>(
+        find.byKey(const Key('foodName')),
+      );
+      expect(nameField.controller!.text, 'Chicken Salad');
+      final caloriesField = tester.widget<TextFormField>(
+        find.byKey(const Key('foodCalories')),
+      );
+      expect(caloriesField.controller!.text, '450');
+      // Tapping only prefills the form; it must not auto-save.
+      expect(repository.entries.length, 1);
+    },
+  );
   testWidgets('small screen supports large text', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;

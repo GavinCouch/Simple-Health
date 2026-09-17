@@ -41,6 +41,8 @@ class MemoryJournal implements JournalRepository {
       entries.removeWhere((e) => e.id == id);
   @override
   Future<void> setGoal(int value) async => goal = value;
+  @override
+  Future<List<QuickAddFood>> recentFoods({int limit = 8}) async => [];
 }
 
 /// Mimics the production `journalRepositoryFor` factory: a fresh, isolated

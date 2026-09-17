@@ -120,4 +120,61 @@ void main() {
       expect((await alice.load('2026-09-15')).entries, hasLength(1));
     },
   );
+
+  test('recentFoods ranks by frequency, breaks ties by recency, folds '
+      'case/whitespace, and stays isolated per user', () async {
+    final directory = await Directory.systemTemp.createTemp('daily_fuel_test');
+    final dbPath = '${directory.path}/journal.db';
+    final alice = SqliteJournal(
+      userId: 1,
+      factory: databaseFactoryFfi,
+      databasePath: dbPath,
+    );
+    final bob = SqliteJournal(
+      userId: 2,
+      factory: databaseFactoryFfi,
+      databasePath: dbPath,
+    );
+    addTearDown(() async {
+      await alice.close();
+      await bob.close();
+      await directory.delete(recursive: true);
+    });
+
+    Future<void> log(
+      SqliteJournal repo,
+      String date,
+      String name,
+      int calories,
+      double servings,
+    ) => repo.saveEntry(
+      FoodEntry(
+        date: date,
+        name: name,
+        meal: Meal.breakfast,
+        calories: calories,
+        servings: servings,
+      ),
+    );
+
+    // Alice logs "coffee" three times with varying case/whitespace/servings,
+    // then "Toast" once. Coffee should win on frequency; its displayed name
+    // and servings should reflect the most recent (third) log.
+    await log(alice, '2026-09-10', 'Coffee', 5, 1);
+    await log(alice, '2026-09-11', 'coffee', 5, 1);
+    await log(alice, '2026-09-12', 'Coffee ', 5, 2);
+    await log(alice, '2026-09-12', 'Toast', 120, 1);
+
+    // Bob's data must never leak into Alice's suggestions.
+    await log(bob, '2026-09-12', 'Bob smoothie', 300, 1);
+
+    final aliceRecents = await alice.recentFoods();
+    expect(aliceRecents.first.name, 'Coffee ');
+    expect(aliceRecents.first.calories, 5);
+    expect(aliceRecents.first.servings, 2);
+    expect(aliceRecents[1].name, 'Toast');
+
+    final bobRecents = await bob.recentFoods();
+    expect(bobRecents.single.name, 'Bob smoothie');
+  });
 }

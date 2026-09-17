@@ -587,6 +587,7 @@ class _FoodEditorState extends State<FoodEditor> {
   late Meal _meal;
   bool _saving = false;
   String? _error;
+  List<QuickAddFood> _recentFoods = const [];
   @override
   void initState() {
     super.initState();
@@ -600,6 +601,25 @@ class _FoodEditorState extends State<FoodEditor> {
     _meal = widget.entry?.meal ?? widget.initialMeal;
     _calories.addListener(_update);
     _servings.addListener(_update);
+    if (widget.entry == null) _loadRecentFoods();
+  }
+
+  Future<void> _loadRecentFoods() async {
+    try {
+      final foods = await widget.repository.recentFoods();
+      if (mounted) setState(() => _recentFoods = foods);
+    } catch (_) {
+      // Suggestions are best-effort; the editor works fine without them.
+    }
+  }
+
+  void _applyQuickAdd(QuickAddFood food) {
+    _name.text = food.name;
+    _calories.text = food.calories.toString();
+    _servings.text = food.servings % 1 == 0
+        ? food.servings.toInt().toString()
+        : food.servings.toString();
+    _update();
   }
 
   void _update() => setState(() {});
@@ -686,6 +706,35 @@ class _FoodEditorState extends State<FoodEditor> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  if (widget.entry == null && _recentFoods.isNotEmpty) ...[
+                    const Text(
+                      'Quick add',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: muted,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      key: const Key('quickAddRow'),
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (var i = 0; i < _recentFoods.length; i++)
+                          ActionChip(
+                            key: ValueKey('quickAddChip_$i'),
+                            label: Text(
+                              '${_recentFoods[i].name} · ${_recentFoods[i].calories} kcal',
+                            ),
+                            onPressed: _saving
+                                ? null
+                                : () => _applyQuickAdd(_recentFoods[i]),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   TextFormField(
                     key: const Key('foodName'),
                     controller: _name,
