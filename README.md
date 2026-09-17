@@ -1,8 +1,13 @@
 # Simple Health
 
-An offline Flutter calorie tracker with food logging by meal, fractional
-servings, daily goals, entry editing/removal, and date history. The interface
-keeps the controls and calorie totals without branding or motivational copy.
+Simple Health is an Android food journal. Log calories by meal, adjust servings,
+set a daily goal, and go back to edit earlier days. Foods you use often appear
+in Quick add. The journal moves to the next day at midnight, even while open.
+
+Sign-in is already part of the app. Create a username and password on your
+device to get started. Accounts and journals live on that device, with a
+separate journal for each account. There is no server, email recovery, or cloud
+sync. Clearing app storage or uninstalling can remove your data.
 
 ## Run the mobile app
 
@@ -23,14 +28,37 @@ targets Android and iOS; iOS builds require macOS and Xcode.
 [Android build workflow](https://github.com/GavinCouch/Simple-Health/actions/workflows/android.yml)
 runs on pushes, pull requests, and manual **Run workflow** requests.
 
-Each run checks Dart formatting, runs static analysis and tests, checks the
-website JavaScript, builds a development APK, and uploads it as an artifact.
-Open a successful workflow run, then download `simple-health-android-<commit>`
-from **Artifacts**. Extract the ZIP to get `app-debug.apk`. Artifacts are kept
-for 14 days. No signing secrets are needed for this development build.
+Each run checks formatting, analysis, tests, and the website JavaScript, then
+builds and launches the APK in an Android emulator. Pushes to `main` and manual runs produce a signed release APK and
+Android App Bundle. Pull requests produce a debug APK without signing secrets.
 
-This APK uses development signing. Store distribution requires configuring
-release signing; this workflow does not publish to Google Play or the App Store.
+Open a successful run and download `simple-health-android-<commit>` under
+**Artifacts**. Extract the ZIP and install `simple-health.apk` on your phone.
+Android may ask you to allow installation from your browser or file manager.
+The `.aab` is for store uploads and cannot be installed directly. Downloads
+include SHA-256 checksums and stay available for 30 days.
+An `android-smoke-<commit>` artifact contains the launch screenshot, device logs,
+and signing certificate details.
+
+Release builds use the same signing key and an increasing build number, so
+future downloads can update an existing release installation. Older debug
+APKs have a different certificate and cannot be updated with a release APK.
+Keep any data you need before replacing an old debug installation.
+
+Pushing a version tag such as `v1.0.0-beta.1` runs the same checks and attaches
+the signed files to a GitHub pre-release. Tags without a suffix create a normal
+release. Nothing is automatically submitted to Google Play.
+
+### Signing
+
+The repository's Actions secrets hold `ANDROID_KEYSTORE_BASE64` and
+`ANDROID_KEYSTORE_PASSWORD`. The key alias is `simple-health`. The private key
+and password must stay out of git; keep a backup for future app updates.
+
+For a fork, add your own PKCS12 keystore with that alias and the same key/store
+password to those secrets. For a local release build, set
+`ANDROID_KEYSTORE_PATH` and `ANDROID_KEYSTORE_PASSWORD`, then run
+`flutter build apk --release`. A release build fails if signing is missing.
 
 ## Local checks and build
 
@@ -41,6 +69,13 @@ flutter analyze
 flutter test
 flutter build apk --debug
 ```
+
+Tests cover account isolation, sign-in, database reopening and upgrades,
+editing/removal, failed saves, quick-add suggestions, and daily rollover.
+Upgrades from the original account-free database keep its unowned records in
+`legacy_entries` and `legacy_settings` for recovery instead of deleting them
+or assigning them to an arbitrary account. Data deleted by an earlier version
+cannot be restored by this update.
 
 ## Website
 

@@ -4,6 +4,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val signingStore = System.getenv("ANDROID_KEYSTORE_PATH")
+val signingPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+val hasReleaseSigning = !signingStore.isNullOrBlank() && !signingPassword.isNullOrBlank()
+
+if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+    require(hasReleaseSigning) { "Release builds require ANDROID_KEYSTORE_PATH and ANDROID_KEYSTORE_PASSWORD." }
+}
+
 android {
     namespace = "com.example.simple_health"
     compileSdk = flutter.compileSdkVersion
@@ -29,11 +37,22 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(signingStore!!)
+                storePassword = signingPassword
+                keyAlias = "simple-health"
+                keyPassword = signingPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

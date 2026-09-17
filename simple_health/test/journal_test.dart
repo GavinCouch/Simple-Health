@@ -7,6 +7,61 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   sqfliteFfiInit();
   test(
+    'v1 upgrade retains unowned data without exposing it to accounts',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('legacy_journal');
+      final dbPath = '${directory.path}/journal.db';
+      final legacy = await databaseFactoryFfi.openDatabase(
+        dbPath,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, _) async {
+            await db.execute(
+              'CREATE TABLE entries (id INTEGER PRIMARY KEY, day TEXT, '
+              'name TEXT, meal INTEGER, calories INTEGER, servings REAL)',
+            );
+            await db.execute('CREATE INDEX entries_day ON entries(day)');
+            await db.execute(
+              'CREATE TABLE settings (id INTEGER PRIMARY KEY, goal INTEGER)',
+            );
+            await db.insert('entries', {
+              'id': 1,
+              'day': '2026-09-17',
+              'name': 'Original breakfast',
+              'meal': 0,
+              'calories': 350,
+              'servings': 1.0,
+            });
+            await db.insert('settings', {'id': 1, 'goal': 2200});
+          },
+        ),
+      );
+      await legacy.close();
+      final repository = SqliteJournal(
+        userId: 1,
+        factory: databaseFactoryFfi,
+        databasePath: dbPath,
+      );
+      addTearDown(() async {
+        await repository.close();
+        await directory.delete(recursive: true);
+      });
+      final snapshot = await repository.load('2026-09-17');
+      expect(snapshot.entries, isEmpty);
+      expect(snapshot.goal, isNull);
+      await repository.setGoal(1800);
+      await repository.close();
+      final db = await databaseFactoryFfi.openDatabase(dbPath);
+      expect(
+        (await db.query('legacy_entries')).single['name'],
+        'Original breakfast',
+      );
+      expect((await db.query('legacy_settings')).single['goal'], 2200);
+      await db.close();
+      expect((await repository.load('2026-09-17')).goal, 1800);
+    },
+  );
+  test(
     'database survives reopening and supports edit, delete, and date isolation',
     () async {
       final directory = await Directory.systemTemp.createTemp(

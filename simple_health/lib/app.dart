@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -47,31 +49,42 @@ class DailyFuelApp extends StatelessWidget {
 }
 
 class JournalPage extends StatefulWidget {
-  const JournalPage({super.key, required this.repository, this.onLogout});
+  const JournalPage({
+    super.key,
+    required this.repository,
+    this.onLogout,
+    this.now = DateTime.now,
+  });
   final JournalRepository repository;
   final VoidCallback? onLogout;
+  final DateTime Function() now;
   @override
   State<JournalPage> createState() => _JournalPageState();
 }
 
 class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
-  DateTime _day = DateUtils.dateOnly(DateTime.now());
+  late DateTime _day;
   JournalSnapshot? _snapshot;
   bool _loading = true;
   bool _failed = false;
   bool _busy = false;
   int _request = 0;
-  DateTime _lastToday = DateUtils.dateOnly(DateTime.now());
+  late DateTime _lastToday;
+  Timer? _midnightTimer;
 
   @override
   void initState() {
     super.initState();
+    _day = DateUtils.dateOnly(widget.now());
+    _lastToday = _day;
     WidgetsBinding.instance.addObserver(this);
+    _scheduleMidnight();
     _load();
   }
 
   @override
   void dispose() {
+    _midnightTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -79,11 +92,31 @@ class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      final today = DateUtils.dateOnly(DateTime.now());
-      if (_day == _lastToday && today != _lastToday) _day = today;
-      _lastToday = today;
+      _updateToday();
+      _scheduleMidnight();
       _load();
     }
+  }
+
+  void _updateToday() {
+    final today = DateUtils.dateOnly(widget.now());
+    if (_day == _lastToday && today != _lastToday) {
+      _day = today;
+      _snapshot = null;
+    }
+    _lastToday = today;
+  }
+
+  void _scheduleMidnight() {
+    _midnightTimer?.cancel();
+    final now = widget.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    _midnightTimer = Timer(midnight.difference(now), () {
+      if (!mounted) return;
+      _updateToday();
+      _load();
+      _scheduleMidnight();
+    });
   }
 
   Future<void> _load() async {
@@ -197,9 +230,10 @@ class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     final disabled = _busy || _loading || _failed;
-    final today = DateUtils.isSameDay(_day, DateTime.now());
+    final today = DateUtils.isSameDay(_day, widget.now());
     return Scaffold(
       appBar: AppBar(
+        title: const Text('Simple Health'),
         actions: [
           IconButton(
             tooltip: 'Edit daily goal',
@@ -274,7 +308,9 @@ class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () => _changeDay(DateTime.now()),
+                        onPressed: _busy
+                            ? null
+                            : () => _changeDay(widget.now()),
                         child: const Text('Back to today'),
                       ),
                     ),

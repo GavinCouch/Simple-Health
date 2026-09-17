@@ -67,6 +67,75 @@ class MemoryJournal implements JournalRepository {
 }
 
 void main() {
+  for (final viewingHistory in [false, true]) {
+    testWidgets(
+      'midnight refresh preserves ${viewingHistory ? 'history' : 'today'} selection',
+      (tester) async {
+        var now = DateTime(2026, 9, 17, 23, 59, 59);
+        final repository = MemoryJournal();
+        await repository.saveEntry(
+          FoodEntry(
+            date: viewingHistory ? '2026-09-16' : '2026-09-17',
+            name: 'Yesterday meal',
+            meal: Meal.breakfast,
+            calories: 300,
+            servings: 1,
+          ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: JournalPage(repository: repository, now: () => now),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (viewingHistory) {
+          await tester.tap(find.byTooltip('Previous day'));
+          await tester.pumpAndSettle();
+        }
+        expect(find.text('Yesterday meal'), findsOneWidget);
+        now = DateTime(2026, 9, 18);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Yesterday meal'),
+          viewingHistory ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.textContaining('Today ·'),
+          viewingHistory ? findsNothing : findsOneWidget,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('resuming on a new day opens today', (tester) async {
+    var now = DateTime(2026, 9, 17, 12);
+    final repository = MemoryJournal();
+    await repository.saveEntry(
+      const FoodEntry(
+        date: '2026-09-17',
+        name: 'Logged lunch',
+        meal: Meal.breakfast,
+        calories: 400,
+        servings: 1,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: JournalPage(repository: repository, now: () => now),
+      ),
+    );
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    now = DateTime(2026, 9, 18, 8);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text('Logged lunch'), findsNothing);
+    expect(find.textContaining('Today ·'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('log fractional servings and navigate history', (tester) async {
     final repository = MemoryJournal();
     await tester.pumpWidget(DailyFuelApp(repository: repository));

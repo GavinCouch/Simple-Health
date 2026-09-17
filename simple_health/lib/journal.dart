@@ -103,11 +103,11 @@ class SqliteJournal implements JournalRepository {
       version: 2,
       onCreate: (db, version) => _createSchema(db),
       onUpgrade: (db, oldVersion, newVersion) async {
-        // Earlier versions kept a single shared journal with no owner, so
-        // there is no sound way to attribute that data to a specific user.
-        await db.execute('DROP TABLE IF EXISTS entries');
-        await db.execute('DROP TABLE IF EXISTS settings');
-        await _createSchema(db);
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE entries RENAME TO legacy_entries');
+          await db.execute('ALTER TABLE settings RENAME TO legacy_settings');
+          await _createSchema(db);
+        }
       },
     ),
   );

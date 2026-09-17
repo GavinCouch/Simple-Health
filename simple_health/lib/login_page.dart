@@ -134,7 +134,7 @@ class _LoginPageState extends State<LoginPage> {
         builder: (_) => RegisterPage(repository: widget.repository),
       ),
     );
-    if (user != null) widget.onLoggedIn(user);
+    if (mounted && user != null) widget.onLoggedIn(user);
   }
 
   @override
